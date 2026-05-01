@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Navigate Your Future — AI Job Risk Explorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06091a;
+  --surface: #0c1226;
+  --surface2: #121b34;
+  --border: #1a2740;
+  --border2: #243350;
+  --lime: #b8ff47;
+  --lime-dim: #7ab82e;
+  --cyan: #00d4ff;
+  --amber: #ffad3b;
+  --coral: #ff5050;
+  --teal: #00e5b0;
+  --text: #e6e0d4;
+  --muted: #6b809e;
+  --muted2: #3d5070;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;overflow-x:hidden;}
+
+/* ───── PROGRESS ───── */
+#progress-wrap{position:fixed;top:0;left:0;right:0;z-index:100;padding:20px 32px;display:flex;align-items:center;gap:16px;background:linear-gradient(to bottom,rgba(6,9,26,0.95),transparent);pointer-events:none;opacity:0;transition:opacity 0.4s;}
+#progress-wrap.visible{opacity:1;}
+.step-dots{display:flex;gap:8px;align-items:center;}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--border2);transition:all 0.3s;}
+.dot.done{background:var(--lime);}
+.dot.active{background:var(--lime);box-shadow:0 0 10px var(--lime);width:24px;border-radius:4px;}
+#progress-label{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;}
+.restart-btn{pointer-events:all;margin-left:auto;background:none;border:1px solid var(--border2);color:var(--muted);font-family:'Syne',sans-serif;font-size:12px;padding:5px 12px;border-radius:4px;cursor:pointer;transition:all 0.2s;}
+.restart-btn:hover{border-color:var(--lime);color:var(--lime);}
+
+/* ───── SCREENS ───── */
+.screen{display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px 40px;width:100%;}
+.screen.active{display:flex;animation:screenIn 0.45s ease forwards;}
+@keyframes screenIn{from{opacity:0;transform:translateX(36px);}to{opacity:1;transform:translateX(0);}}
+
+/* ───── INTRO ───── */
+#screen-intro{position:relative;overflow:hidden;}
+.grid-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(0,212,255,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.04) 1px,transparent 1px);background-size:60px 60px;animation:gridMove 20s linear infinite;}
+@keyframes gridMove{from{background-position:0 0;}to{background-position:60px 60px;}}
+.glow-orb{position:absolute;border-radius:50%;filter:blur(80px);animation:orbFloat 8s ease-in-out infinite;}
+.orb1{width:400px;height:400px;background:rgba(0,212,255,0.07);top:-100px;right:-100px;animation-delay:0s;}
+.orb2{width:300px;height:300px;background:rgba(184,255,71,0.05);bottom:-50px;left:-50px;animation-delay:-4s;}
+@keyframes orbFloat{0%,100%{transform:translateY(0) scale(1);}50%{transform:translateY(-30px) scale(1.05);}}
+.intro-content{position:relative;z-index:2;text-align:center;max-width:640px;}
+.intro-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.2);border-radius:100px;padding:6px 16px;font-family:'DM Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:32px;}
+.intro-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.intro-title{font-size:clamp(52px,8vw,88px);font-weight:800;line-height:0.95;letter-spacing:-0.03em;margin-bottom:24px;}
+.intro-title span{color:var(--lime);display:block;}
+.intro-desc{font-size:17px;line-height:1.65;color:var(--muted);max-width:480px;margin:0 auto 40px;}
+.intro-desc strong{color:var(--text);}
+.start-btn{background:var(--lime);color:#06091a;font-family:'Syne',sans-serif;font-weight:700;font-size:16px;border:none;padding:16px 40px;border-radius:6px;cursor:pointer;transition:all 0.25s;letter-spacing:0.02em;}
+.start-btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(184,255,71,0.35);}
+.dataset-note{margin-top:24px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted2);}
+
+/* ───── STEP SCREENS ───── */
+.step-content{max-width:780px;width:100%;}
+.step-eyebrow{font-family:'DM Mono',monospace;font-size:11px;color:var(--lime);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:16px;}
+.step-title{font-size:clamp(26px,4vw,38px);font-weight:700;line-height:1.15;letter-spacing:-0.02em;margin-bottom:10px;}
+.step-sub{font-size:15px;color:var(--muted);margin-bottom:40px;}
+
+/* ── CHOICE CARDS ── */
+.cards-grid{display:grid;gap:14px;margin-bottom:32px;}
+.cards-grid.cols-3{grid-template-columns:repeat(3,1fr);}
+.cards-grid.cols-2{grid-template-columns:repeat(2,1fr);}
+.cards-grid.cols-skills{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+@media(max-width:600px){.cards-grid.cols-3,.cards-grid.cols-2{grid-template-columns:1fr;}}
+.choice-card{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:24px 20px;cursor:pointer;transition:all 0.22s;position:relative;overflow:hidden;user-select:none;}
+.choice-card::before{content:'';position:absolute;inset:0;background:var(--lime);opacity:0;transition:opacity 0.22s;}
+.choice-card:hover{border-color:var(--border2);background:var(--surface2);transform:translateY(-2px);}
+.choice-card.selected{border-color:var(--lime);background:rgba(184,255,71,0.06);}
+.choice-card.selected .card-icon{color:var(--lime);}
+.choice-card.selected .card-title{color:var(--lime);}
+.card-check{position:absolute;top:12px;right:12px;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:10px;transition:all 0.2s;}
+.choice-card.selected .card-check{background:var(--lime);border-color:var(--lime);color:#06091a;}
+.card-icon{font-size:28px;margin-bottom:12px;color:var(--muted2);transition:color 0.2s;line-height:1;}
+.card-title{font-size:16px;font-weight:700;margin-bottom:4px;transition:color 0.2s;}
+.card-value{font-family:'DM Mono',monospace;font-size:13px;color:var(--lime);margin-bottom:6px;}
+.card-desc{font-size:13px;color:var(--muted);}
+
+/* Skill chips */
+.skill-chip{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--surface);border:1.5px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.2s;}
+.skill-chip:hover{border-color:var(--border2);background:var(--surface2);}
+.skill-chip.selected{border-color:var(--lime);background:rgba(184,255,71,0.06);}
+.skill-chip .chip-dot{width:10px;height:10px;border-radius:50%;background:var(--muted2);transition:background 0.2s;flex-shrink:0;}
+.skill-chip.selected .chip-dot{background:var(--lime);}
+.skill-chip .chip-name{font-size:14px;font-weight:600;}
+.skill-chip .chip-job{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);}
+
+/* Risk cards (full-width 2col) */
+.risk-card .card-icon{font-size:36px;}
+.risk-card .risk-meter{display:flex;gap:4px;margin-top:12px;}
+.risk-meter .seg{height:4px;border-radius:2px;flex:1;}
+.risk-card[data-val="safe"] .seg{background:var(--teal);}
+.risk-card[data-val="bold"] .seg{background:var(--coral);}
+.risk-card[data-val="safe"] .seg:nth-child(3),.risk-card[data-val="safe"] .seg:nth-child(4){background:var(--border2);}
+.risk-card[data-val="bold"] .seg{background:var(--coral);}
+
+/* ── NEXT BTN ── */
+.next-btn{background:var(--lime);color:#06091a;font-family:'Syne',sans-serif;font-weight:700;font-size:15px;border:none;padding:14px 36px;border-radius:6px;cursor:pointer;transition:all 0.25s;opacity:0.35;pointer-events:none;}
+.next-btn.enabled{opacity:1;pointer-events:all;}
+.next-btn.enabled:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(184,255,71,0.3);}
+.skip-link{margin-left:16px;background:none;border:none;color:var(--muted);font-family:'Syne',sans-serif;font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px;}
+.btn-row{display:flex;align-items:center;gap:0;}
+
+/* ───── RESULTS ───── */
+#screen-results{min-height:100vh;padding:80px 24px 60px;align-items:flex-start;justify-content:flex-start;}
+.results-inner{max-width:1100px;width:100%;margin:0 auto;}
+
+.results-header{margin-bottom:32px;}
+.results-title{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-0.03em;margin-bottom:8px;}
+.results-title span{color:var(--lime);}
+.choices-summary{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}
+.choice-pill{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:100px;padding:4px 12px 4px 8px;font-size:12px;}
+.pill-dot{width:6px;height:6px;border-radius:50%;background:var(--lime);}
+
+/* Chart + sidebar layout */
+.results-main{display:grid;grid-template-columns:1fr 340px;gap:24px;margin-bottom:28px;}
+@media(max-width:900px){.results-main{grid-template-columns:1fr;}}
+
+.chart-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;position:relative;}
+.chart-title{font-size:14px;font-weight:600;color:var(--muted);margin-bottom:4px;letter-spacing:0.05em;text-transform:uppercase;}
+.chart-subtitle{font-size:12px;font-family:'DM Mono',monospace;color:var(--muted2);margin-bottom:16px;}
+#bubble-canvas{width:100%;height:380px;cursor:crosshair;}
+.chart-legend{display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.legend-dot{width:10px;height:10px;border-radius:50%;}
+
+/* Tooltip */
+#tooltip{position:fixed;background:rgba(12,18,38,0.96);border:1px solid var(--border2);border-radius:8px;padding:12px 16px;font-size:13px;pointer-events:none;z-index:200;opacity:0;transition:opacity 0.15s;max-width:220px;backdrop-filter:blur(8px);}
+#tooltip.visible{opacity:1;}
+.tt-title{font-weight:700;font-size:14px;margin-bottom:6px;}
+.tt-row{display:flex;justify-content:space-between;gap:16px;font-family:'DM Mono',monospace;font-size:12px;color:var(--muted);margin-top:3px;}
+.tt-row span:last-child{color:var(--text);}
+
+/* Sidebar */
+.sidebar-panel{display:flex;flex-direction:column;gap:14px;}
+.insight-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px;opacity:0;transform:translateY(10px);transition:all 0.4s;}
+.insight-card.revealed{opacity:1;transform:translateY(0);}
+.insight-tag{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:8px;}
+.insight-tag.warn{color:var(--coral);}
+.insight-tag.safe{color:var(--teal);}
+.insight-tag.info{color:var(--amber);}
+.insight-tag.highlight{color:var(--lime);}
+.insight-text{font-size:13px;line-height:1.6;color:var(--text);}
+.insight-text strong{color:var(--lime);}
+.insight-text em{color:var(--coral);font-style:normal;font-weight:600;}
+.stat-pair{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.stat-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;}
+.stat-val.green{color:var(--teal);}
+.stat-val.red{color:var(--coral);}
+.stat-lbl{font-size:11px;color:var(--muted);}
+
+/* Career cards */
+.cards-section-title{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.cards-section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+#careers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.career-card{background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:18px;position:relative;overflow:hidden;transition:all 0.2s;cursor:pointer;opacity:0;transform:translateY(8px);}
+.career-card.show{opacity:1;transform:translateY(0);}
+.career-card:hover{border-color:var(--border2);transform:translateY(-2px);}
+.career-card.matched{border-color:rgba(184,255,71,0.4);}
+.career-card.highlighted{border-color:var(--lime);box-shadow:0 0 20px rgba(184,255,71,0.15);}
+.cc-stripe{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:10px 0 0 10px;}
+.stripe-low{background:var(--teal);}
+.stripe-med{background:var(--amber);}
+.stripe-high{background:var(--coral);}
+.cc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;}
+.cc-title{font-size:15px;font-weight:700;padding-left:10px;}
+.cc-exp-badge{font-family:'DM Mono',monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:3px 8px;color:var(--muted);white-space:nowrap;}
+.cc-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-left:10px;margin-top:8px;}
+.cc-metric{display:flex;flex-direction:column;gap:2px;}
+.cc-metric-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;}
+.cc-metric-val{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;}
+.cc-skill-tag{margin-left:10px;margin-top:10px;display:inline-flex;align-items:center;gap:4px;background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.15);border-radius:100px;padding:3px 10px;font-size:11px;color:var(--cyan);}
+.match-badge{position:absolute;top:12px;right:12px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;padding:2px 8px;border-radius:100px;background:rgba(184,255,71,0.1);color:var(--lime);border:1px solid rgba(184,255,71,0.25);}
+
+.no-match-msg{text-align:center;padding:48px 24px;color:var(--muted);}
+.no-match-msg h3{font-size:18px;margin-bottom:8px;}
+.no-match-msg p{font-size:14px;line-height:1.6;}
+
+/* Axes labels */
+.axis-label{font-family:'DM Mono',monospace;font-size:11px;fill:var(--muted);}
+
+/* Empty state for no match */
+</style>
+</head>
+<body>
+
+<!-- PROGRESS BAR -->
+<div id="progress-wrap">
+  <div class="step-dots" id="step-dots">
+    <div class="dot" id="dot-1"></div>
+    <div class="dot" id="dot-2"></div>
+    <div class="dot" id="dot-3"></div>
+    <div class="dot" id="dot-4"></div>
+  </div>
+  <span id="progress-label">STEP 1 OF 4</span>
+  <button class="restart-btn" onclick="restart()">↩ Restart</button>
+</div>
+
+<!-- TOOLTIP -->
+<div id="tooltip"></div>
+
+<!-- ═══════════════ INTRO ═══════════════ -->
+<div class="screen active" id="screen-intro">
+  <div class="grid-bg"></div>
+  <div class="glow-orb orb1"></div>
+  <div class="glow-orb orb2"></div>
+  <div class="intro-content">
+    <div class="intro-badge"><span></span> 12,343 Job Records Analyzed</div>
+    <h1 class="intro-title">Navigate<span>Your Future.</span></h1>
+    <p class="intro-desc">AI is reshaping every career. <strong>4 questions</strong> will reveal which paths will thrive — and which ones are quietly disappearing. Patterns may surprise you.</p>
+    <button class="start-btn" onclick="goToStep(1)">Begin the Journey &rarr;</button>
+    <p class="dataset-note">Future of Jobs · AI Impact Dataset · 10 roles · 6 countries</p>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 1: SALARY ═══════════════ -->
+<div class="screen" id="screen-1">
+  <div class="step-content">
+    <div class="step-eyebrow">Step 01 · Compensation</div>
+    <h2 class="step-title">What salary range<br>are you targeting?</h2>
+    <p class="step-sub">We'll focus on careers within your financial horizon.</p>
+    <div class="cards-grid cols-3" id="salary-cards">
+      <div class="choice-card" data-val="low" onclick="selectSingle('salary','low',this)">
+        <div class="card-check">✓</div>
+        <div class="card-icon">◎</div>
+        <div class="card-title">Starting Out</div>
+        <div class="card-value">Under $25K</div>
+        <div class="card-desc">Entry-level foundation building</div>
+      </div>
+      <div class="choice-card" data-val="medium" onclick="selectSingle('salary','medium',this)">
+        <div class="card-check">✓</div>
+        <div class="card-icon">◉</div>
+        <div class="card-title">Growing Fast</div>
+        <div class="card-value">$25K – $50K</div>
+        <div class="card-desc">Mid-career acceleration</div>
+      </div>
+      <div class="choice-card" data-val="high" onclick="selectSingle('salary','high',this)">
+        <div class="card-check">✓</div>
+        <div class="card-icon">⬡</div>
+        <div class="card-title">Top Earner</div>
+        <div class="card-value">$50K +</div>
+        <div class="card-desc">Senior-level premium</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="next-btn" id="next-1" onclick="goToStep(2)">Continue &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 2: TECH ═══════════════ -->
+<div class="screen" id="screen-2">
+  <div class="step-content">
+    <div class="step-eyebrow">Step 02 · Domain</div>
+    <h2 class="step-title">Are you interested<br>in technology roles?</h2>
+    <p class="step-sub">This shapes the lens through which we'll map your future.</p>
+    <div class="cards-grid cols-2">
+      <div class="choice-card" data-val="yes" onclick="selectSingle('tech','yes',this)">
+        <div class="card-check">✓</div>
+        <div class="card-icon">⚙️</div>
+        <div class="card-title">Yes, tech-first</div>
+        <div class="card-value">Engineering, AI, Data</div>
+        <div class="card-desc">I want to build systems, write code, or work with data at a technical level.</div>
+      </div>
+      <div class="choice-card" data-val="no" onclick="selectSingle('tech','no',this)">
+        <div class="card-check">✓</div>
+        <div class="card-icon">💼</div>
+        <div class="card-title">Not primarily</div>
+        <div class="card-value">Strategy, Analysis, Management</div>
+        <div class="card-desc">I prefer business, strategic, or analytical roles over pure engineering.</div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="next-btn" id="next-2" onclick="goToStep(3)">Continue &rarr;</button>
+      <button class="skip-link" onclick="skipStep('tech'); goToStep(3)">Skip &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 3: SKILLS ═══════════════ -->
+<div class="screen" id="screen-3">
+  <div class="step-content">
+    <div class="step-eyebrow">Step 03 · Skills</div>
+    <h2 class="step-title">Which skills do you have<br>or want to develop?</h2>
+    <p class="step-sub">Select all that apply. Each skill maps to specific career families.</p>
+    <div class="cards-grid cols-skills" id="skill-chips"></div>
+    <div class="btn-row">
+      <button class="next-btn" id="next-3" onclick="goToStep(4)">Continue &rarr;</button>
+      <button class="skip-link" onclick="skipStep('skills'); goToStep(4)">Skip &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ STEP 4: RISK ═══════════════ -->
+<div class="screen" id="screen-4">
+  <div class="step-content">
+    <div class="step-eyebrow">Step 04 · Risk Tolerance</div>
+    <h2 class="step-title">How do you feel about<br>AI disruption?</h2>
+    <p class="step-sub">Your appetite for risk will calibrate which career stories we surface.</p>
+    <div class="cards-grid cols-2">
+      <div class="choice-card" data-val="safe" onclick="selectSingle('risk','safe',this)">
+        <div class="card-check">✓</div>
+        <div class="card-icon">🛡️</div>
+        <div class="card-title">Play It Safe</div>
+        <div class="card-value">Low AI Risk (&lt; 0.35)</div>
+        <div class="card-desc">I want a career that's resilient against AI automation. Stability is priority.</div>
+        <div class="risk-meter"><div class="seg"></div><div class="seg"></div><div class="seg"></div><div class="seg"></div></div>
+      </div>
+      <div class="choice-card" data-val="bold" onclick="selectSingle('risk','bold',this)">
+        <div class="card-check">✓</div>
+        <div class="card-icon">⚡</div>
+        <div class="card-title">Embrace Change</div>
+        <div class="card-value">All Risk Levels</div>
+        <div class="card-desc">I can adapt. Show me the full picture, including high-risk paths with high reward.</div>
+        <div class="risk-meter"><div class="seg" style="background:var(--coral)"></div><div class="seg" style="background:var(--amber)"></div><div class="seg" style="background:var(--teal)"></div><div class="seg" style="background:var(--lime)"></div></div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="next-btn" id="next-4" onclick="showResults()">See My Results &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ RESULTS ═══════════════ -->
+<div class="screen" id="screen-results">
+  <div class="results-inner">
+
+    <div class="results-header">
+      <p class="step-eyebrow" style="margin-bottom:8px;">Your Career Map</p>
+      <h2 class="results-title">Here's what the data <span>reveals</span></h2>
+      <div class="choices-summary" id="choices-summary"></div>
+    </div>
+
+    <div class="results-main">
+      <!-- Bubble Chart -->
+      <div class="chart-panel">
+        <div class="chart-title">Salary vs. AI Risk</div>
+        <div class="chart-subtitle">Bubble size = career survival score · Hover for details · Click to highlight</div>
+        <canvas id="bubble-canvas"></canvas>
+        <div class="chart-legend">
+          <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Low Risk</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--amber)"></div>Medium Risk</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--coral)"></div>High Risk</div>
+          <div class="legend-item"><div class="legend-dot" style="background:var(--lime);border:1px solid rgba(0,0,0,0.3)"></div>Your Match</div>
+        </div>
+      </div>
+
+      <!-- Insights Sidebar -->
+      <div class="sidebar-panel" id="insights-panel"></div>
+    </div>
+
+    <!-- Career Cards -->
+    <p class="cards-section-title">Matched Careers</p>
+    <div id="careers-grid"></div>
+
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════
+//  DATA (aggregated from 12,343 rows)
+// ═══════════════════════════════════
+const DATA = [
+  {job:"AI Researcher",exp:"Entry",isTech:true,salary:30346,risk:0.152,openings:25655,skillDemand:79.1,survival:1.80,riskCat:"Low Risk",skills:["Deep Learning"]},
+  {job:"AI Researcher",exp:"Mid",isTech:true,salary:43749,risk:0.152,openings:25224,skillDemand:79.4,survival:1.92,riskCat:"Low Risk",skills:["Deep Learning"]},
+  {job:"AI Researcher",exp:"Senior",isTech:true,salary:63095,risk:0.146,openings:23938,skillDemand:80.2,survival:1.95,riskCat:"Low Risk",skills:["Deep Learning"]},
+  {job:"Business Analyst",exp:"Entry",isTech:false,salary:16291,risk:0.751,openings:25562,skillDemand:79.8,survival:0.20,riskCat:"High Risk",skills:["Excel"]},
+  {job:"Business Analyst",exp:"Mid",isTech:false,salary:23607,risk:0.751,openings:25119,skillDemand:79.7,survival:0.40,riskCat:"High Risk",skills:["Excel"]},
+  {job:"Business Analyst",exp:"Senior",isTech:false,salary:34138,risk:0.749,openings:26129,skillDemand:79.8,survival:0.69,riskCat:"High Risk",skills:["Excel"]},
+  {job:"Cloud Engineer",exp:"Entry",isTech:true,salary:25578,risk:0.348,openings:25981,skillDemand:78.9,survival:1.17,riskCat:"Medium Risk",skills:["AWS"]},
+  {job:"Cloud Engineer",exp:"Mid",isTech:true,salary:37022,risk:0.353,openings:24459,skillDemand:79.4,survival:1.45,riskCat:"Medium Risk",skills:["AWS"]},
+  {job:"Cloud Engineer",exp:"Senior",isTech:true,salary:55264,risk:0.357,openings:24651,skillDemand:80.1,survival:1.83,riskCat:"Medium Risk",skills:["AWS"]},
+  {job:"Cybersecurity Analyst",exp:"Entry",isTech:true,salary:19858,risk:0.246,openings:24784,skillDemand:79.0,survival:1.27,riskCat:"Low Risk",skills:["Security"]},
+  {job:"Cybersecurity Analyst",exp:"Mid",isTech:true,salary:28304,risk:0.253,openings:24418,skillDemand:79.2,survival:1.51,riskCat:"Low Risk",skills:["Security"]},
+  {job:"Cybersecurity Analyst",exp:"Senior",isTech:true,salary:42225,risk:0.254,openings:25211,skillDemand:78.3,survival:1.81,riskCat:"Low Risk",skills:["Security"]},
+  {job:"Data Analyst",exp:"Entry",isTech:true,salary:13330,risk:0.649,openings:24806,skillDemand:79.3,survival:0.35,riskCat:"High Risk",skills:["SQL"]},
+  {job:"Data Analyst",exp:"Mid",isTech:true,salary:19114,risk:0.650,openings:26317,skillDemand:79.8,survival:0.57,riskCat:"High Risk",skills:["SQL"]},
+  {job:"Data Analyst",exp:"Senior",isTech:true,salary:28881,risk:0.649,openings:25527,skillDemand:79.2,survival:0.78,riskCat:"High Risk",skills:["SQL"]},
+  {job:"Data Scientist",exp:"Entry",isTech:true,salary:22757,risk:0.353,openings:26337,skillDemand:78.6,survival:1.14,riskCat:"Medium Risk",skills:["Python"]},
+  {job:"Data Scientist",exp:"Mid",isTech:true,salary:32426,risk:0.353,openings:24849,skillDemand:79.4,survival:1.36,riskCat:"Medium Risk",skills:["Python"]},
+  {job:"Data Scientist",exp:"Senior",isTech:true,salary:49279,risk:0.351,openings:25792,skillDemand:78.8,survival:1.76,riskCat:"Medium Risk",skills:["Python"]},
+  {job:"DevOps Engineer",exp:"Entry",isTech:true,salary:24203,risk:0.301,openings:25724,skillDemand:79.1,survival:1.27,riskCat:"Medium Risk",skills:["Docker"]},
+  {job:"DevOps Engineer",exp:"Mid",isTech:true,salary:34547,risk:0.302,openings:25186,skillDemand:80.2,survival:1.56,riskCat:"Medium Risk",skills:["Docker"]},
+  {job:"DevOps Engineer",exp:"Senior",isTech:true,salary:51166,risk:0.294,openings:24992,skillDemand:79.2,survival:1.84,riskCat:"Low Risk",skills:["Docker"]},
+  {job:"ML Engineer",exp:"Entry",isTech:true,salary:27876,risk:0.253,openings:24054,skillDemand:79.1,survival:1.49,riskCat:"Low Risk",skills:["Python"]},
+  {job:"ML Engineer",exp:"Mid",isTech:true,salary:40385,risk:0.257,openings:25218,skillDemand:79.7,survival:1.79,riskCat:"Low Risk",skills:["Python"]},
+  {job:"ML Engineer",exp:"Senior",isTech:true,salary:56802,risk:0.248,openings:24726,skillDemand:79.9,survival:1.87,riskCat:"Low Risk",skills:["Python"]},
+  {job:"Product Manager",exp:"Entry",isTech:false,salary:26652,risk:0.400,openings:25918,skillDemand:79.9,survival:1.12,riskCat:"Medium Risk",skills:["Strategy"]},
+  {job:"Product Manager",exp:"Mid",isTech:false,salary:38890,risk:0.404,openings:25198,skillDemand:79.2,survival:1.39,riskCat:"Medium Risk",skills:["Strategy"]},
+  {job:"Product Manager",exp:"Senior",isTech:false,salary:57548,risk:0.399,openings:24182,skillDemand:79.6,survival:1.81,riskCat:"Medium Risk",skills:["Strategy"]},
+  {job:"Software Engineer",exp:"Entry",isTech:true,salary:20426,risk:0.451,openings:24924,skillDemand:79.4,survival:0.96,riskCat:"Medium Risk",skills:["Java"]},
+  {job:"Software Engineer",exp:"Mid",isTech:true,salary:29911,risk:0.452,openings:26544,skillDemand:79.9,survival:1.09,riskCat:"Medium Risk",skills:["Java"]},
+  {job:"Software Engineer",exp:"Senior",isTech:true,salary:43513,risk:0.440,openings:25151,skillDemand:80.3,survival:1.47,riskCat:"Medium Risk",skills:["Java"]}
+];
+
+const SKILLS_META = [
+  {skill:"Deep Learning",job:"AI Researcher",icon:"🤖"},
+  {skill:"Python",job:"Data Scientist / ML Eng",icon:"🐍"},
+  {skill:"Security",job:"Cybersecurity",icon:"🔐"},
+  {skill:"AWS",job:"Cloud Engineer",icon:"☁️"},
+  {skill:"Docker",job:"DevOps Engineer",icon:"🐳"},
+  {skill:"Java",job:"Software Engineer",icon:"☕"},
+  {skill:"SQL",job:"Data Analyst",icon:"🗄️"},
+  {skill:"Excel",job:"Business Analyst",icon:"📊"},
+  {skill:"Strategy",job:"Product Manager",icon:"🧭"},
+];
+
+// ═══════════════════════════════════
+//  STATE
+// ═══════════════════════════════════
+let currentStep = 0;
+let choices = { salary: null, tech: null, skills: [], risk: null };
+let highlightedIdx = null;
+let canvasData = []; // [{d, x, y, r, color, matched, idx}]
+
+// ═══════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════
+function goToStep(step) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+
+  currentStep = step;
+  const id = step === 0 ? 'screen-intro' : `screen-${step}`;
+  const next = document.getElementById(id);
+  if (next) next.classList.add('active');
+
+  // progress bar
+  const pw = document.getElementById('progress-wrap');
+  if (step >= 1 && step <= 4) {
+    pw.classList.add('visible');
+    document.getElementById('progress-label').textContent = `STEP ${step} OF 4`;
+    for (let i = 1; i <= 4; i++) {
+      const dot = document.getElementById(`dot-${i}`);
+      dot.className = 'dot' + (i < step ? ' done' : '') + (i === step ? ' active' : '');
+    }
+  } else if (step === 0) {
+    pw.classList.remove('visible');
+  } else {
+    pw.classList.add('visible');
+    document.getElementById('progress-label').textContent = 'RESULTS';
+    for (let i = 1; i <= 4; i++) document.getElementById(`dot-${i}`).className = 'dot done';
+  }
+}
+
+function restart() {
+  choices = { salary: null, tech: null, skills: [], risk: null };
+  highlightedIdx = null;
+  document.querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.skill-chip').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.next-btn').forEach(b => b.classList.remove('enabled'));
+  goToStep(0);
+}
+
+function showResults() {
+  goToStep('results');
+  setTimeout(buildResults, 100);
+}
+
+function skipStep(field) {
+  if (field === 'tech') choices.tech = null;
+  if (field === 'skills') choices.skills = [];
+}
+
+// ═══════════════════════════════════
+//  SELECTION LOGIC
+// ═══════════════════════════════════
+function selectSingle(field, val, el) {
+  choices[field] = val;
+  el.closest('.cards-grid').querySelectorAll('.choice-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  // enable next
+  const stepMap = {salary:1, tech:2, risk:4};
+  if (stepMap[field]) {
+    const btn = document.getElementById(`next-${stepMap[field]}`);
+    if (btn) btn.classList.add('enabled');
+  }
+}
+
+function toggleSkill(skill, el) {
+  const idx = choices.skills.indexOf(skill);
+  if (idx === -1) {
+    choices.skills.push(skill);
+    el.classList.add('selected');
+  } else {
+    choices.skills.splice(idx, 1);
+    el.classList.remove('selected');
+  }
+  document.getElementById('next-3').classList.add('enabled');
+}
+
+// ═══════════════════════════════════
+//  BUILD SKILL CHIPS
+// ═══════════════════════════════════
+(function buildSkillChips() {
+  const grid = document.getElementById('skill-chips');
+  SKILLS_META.forEach(sm => {
+    const div = document.createElement('div');
+    div.className = 'skill-chip';
+    div.innerHTML = `
+      <div class="chip-dot"></div>
+      <div>
+        <div class="chip-name">${sm.icon} ${sm.skill}</div>
+        <div class="chip-job">${sm.job}</div>
+      </div>`;
+    div.onclick = () => toggleSkill(sm.skill, div);
+    grid.appendChild(div);
+  });
+  // enable next-3 even with no skills
+  document.getElementById('next-3').classList.add('enabled');
+})();
+
+// ═══════════════════════════════════
+//  MATCH SCORING
+// ═══════════════════════════════════
+function scoreMatch(d) {
+  let pts = 0, total = 0;
+
+  if (choices.salary !== null) {
+    total++;
+    if (choices.salary === 'low' && d.salary < 25000) pts++;
+    else if (choices.salary === 'medium' && d.salary >= 25000 && d.salary < 50000) pts++;
+    else if (choices.salary === 'high' && d.salary >= 50000) pts++;
+  }
+
+  if (choices.tech !== null) {
+    total++;
+    if (choices.tech === 'yes' && d.isTech) pts++;
+    else if (choices.tech === 'no' && !d.isTech) pts++;
+  }
+
+  if (choices.skills.length > 0) {
+    total++;
+    if (d.skills.some(s => choices.skills.includes(s))) pts++;
+  }
+
+  if (choices.risk !== null) {
+    total++;
+    if (choices.risk === 'safe' && (d.riskCat === 'Low Risk' || d.riskCat === 'Medium Risk')) pts++;
+    else if (choices.risk === 'bold') pts++;
+  }
+
+  return total === 0 ? 1 : pts / total;
+}
+
+// ═══════════════════════════════════
+//  BUILD RESULTS
+// ═══════════════════════════════════
+function buildResults() {
+  buildSummaryPills();
+  buildInsights();
+  buildCareerCards();
+  setTimeout(() => drawBubbleChart(), 200);
+}
+
+function buildSummaryPills() {
+  const el = document.getElementById('choices-summary');
+  const labels = [
+    choices.salary ? ({low:'Salary: Under $25K', medium:'Salary: $25K–$50K', high:'Salary: $50K+'})[choices.salary] : null,
+    choices.tech !== null ? (choices.tech === 'yes' ? 'Tech Roles' : 'Non-Tech Roles') : null,
+    choices.skills.length > 0 ? `Skills: ${choices.skills.join(', ')}` : null,
+    choices.risk ? (choices.risk === 'safe' ? 'Low Risk' : 'All Risk Levels') : null,
+  ].filter(Boolean);
+  el.innerHTML = labels.map(l => `<div class="choice-pill"><div class="pill-dot"></div>${l}</div>`).join('');
+  if (!labels.length) el.innerHTML = `<div class="choice-pill"><div class="pill-dot"></div>Showing all careers</div>`;
+}
+
+function buildInsights() {
+  const panel = document.getElementById('insights-panel');
+  const insights = [
+    {
+      tag:'highlight', tagLabel:'Key Finding',
+      text:'<strong>AI-native roles have up to 5× lower risk.</strong> AI Researchers (0.15) and ML Engineers (0.25) are built to survive the automation wave — they&apos;re part of it.',
+      stat1:{val:'0.15', cls:'green', lbl:'AI Researcher risk'},
+      stat2:{val:'0.75', cls:'red', lbl:'Business Analyst risk'}
+    },
+    {
+      tag:'warn', tagLabel:'The Salary Trap',
+      text:'<em>High salary ≠ low risk.</em> Business Analysts earn more than entry AI roles, yet carry the highest displacement risk. Seniority in a declining field is still decline.',
+      stat1:{val:'$34K', cls:'red', lbl:'Senior BA salary'},
+      stat2:{val:'0.75', cls:'red', lbl:'Senior BA risk score'}
+    },
+    {
+      tag:'safe', tagLabel:'Entry-Level Edge',
+      text:'An <strong>Entry ML Engineer</strong> (risk: 0.25) is significantly safer than a <strong>Senior Data Analyst</strong> (risk: 0.65). Picking the right field beats climbing the wrong ladder.',
+      stat1:{val:'0.25', cls:'green', lbl:'Entry ML Engineer'},
+      stat2:{val:'0.65', cls:'red', lbl:'Senior Data Analyst'}
+    },
+    {
+      tag:'info', tagLabel:'Tech ≠ Safe',
+      text:'<em>Being in tech is not enough.</em> Data Analysts and Software Engineers sit in medium-to-high risk zones. The skill matters more than the industry label.',
+      stat1:{val:'0.65', cls:'red', lbl:'Data Analyst risk'},
+      stat2:{val:'0.45', cls:'green', lbl:'DevOps risk'}
+    },
+  ];
+
+  panel.innerHTML = insights.map((ins, i) => `
+    <div class="insight-card" id="ins-${i}" style="transition-delay:${i*0.15}s">
+      <div class="insight-tag ${ins.tag}">${ins.tagLabel}</div>
+      <p class="insight-text">${ins.text}</p>
+      <div class="stat-pair">
+        <div><div class="stat-val ${ins.stat1.cls}">${ins.stat1.val}</div><div class="stat-lbl">${ins.stat1.lbl}</div></div>
+        <div style="text-align:right"><div class="stat-val ${ins.stat2.cls}">${ins.stat2.val}</div><div class="stat-lbl">${ins.stat2.lbl}</div></div>
+      </div>
+    </div>`).join('');
+
+  insights.forEach((_, i) => {
+    setTimeout(() => document.getElementById(`ins-${i}`)?.classList.add('revealed'), 400 + i * 200);
+  });
+}
+
+function buildCareerCards() {
+  const grid = document.getElementById('careers-grid');
+  const scored = DATA.map((d, i) => ({d, i, score: scoreMatch(d)}))
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.d.risk - b.d.risk;
+    });
+
+  const stripeClass = d => ({
+    'Low Risk':'stripe-low',
+    'Medium Risk':'stripe-med',
+    'High Risk':'stripe-high'
+  })[d.riskCat];
+
+  const survivalLabel = s => s >= 1.5 ? '🟢 Strong' : s >= 0.8 ? '🟡 Moderate' : '🔴 At Risk';
+
+  grid.innerHTML = scored.filter(({score}) => score > 0).map(({d, i, score}) => `
+    <div class="career-card ${score >= 0.75 ? 'matched' : ''}" id="card-${i}" onclick="highlightBubble(${i})" style="transition-delay:${Math.random()*0.3}s">
+      ${score >= 0.75 ? '<div class="match-badge">Best Match</div>' : ''}
+      <div class="cc-stripe ${stripeClass(d)}"></div>
+      <div class="cc-top">
+        <div class="cc-title">${d.job}</div>
+        <div class="cc-exp-badge">${d.exp}</div>
+      </div>
+      <div class="cc-metrics">
+        <div class="cc-metric">
+          <span class="cc-metric-lbl">Salary</span>
+          <span class="cc-metric-val">$${(d.salary/1000).toFixed(0)}K</span>
+        </div>
+        <div class="cc-metric">
+          <span class="cc-metric-lbl">AI Risk</span>
+          <span class="cc-metric-val" style="color:${riskColor(d.riskCat)}">${d.risk.toFixed(2)}</span>
+        </div>
+        <div class="cc-metric">
+          <span class="cc-metric-lbl">Openings</span>
+          <span class="cc-metric-val">${(d.openings/1000).toFixed(0)}K</span>
+        </div>
+        <div class="cc-metric">
+          <span class="cc-metric-lbl">Survival</span>
+          <span class="cc-metric-val" style="font-size:11px">${survivalLabel(d.survival)}</span>
+        </div>
+      </div>
+      <div class="cc-skill-tag">${d.skills[0]}</div>
+    </div>`).join('');
+
+  if (!grid.children.length) {
+    grid.innerHTML = `<div class="no-match-msg"><h3>No close matches</h3><p>Try adjusting your filters or clicking Restart to explore different preferences.</p></div>`;
+  }
+
+  setTimeout(() => grid.querySelectorAll('.career-card').forEach(c => c.classList.add('show')), 100);
+}
+
+function riskColor(cat) {
+  return {
+    'Low Risk': 'var(--teal)',
+    'Medium Risk': 'var(--amber)',
+    'High Risk': 'var(--coral)'
+  }[cat] || 'var(--muted)';
+}
+
+function highlightBubble(idx) {
+  highlightedIdx = idx;
+  document.querySelectorAll('.career-card').forEach(c => c.classList.remove('highlighted'));
+  document.getElementById(`card-${idx}`)?.classList.add('highlighted');
+  drawBubbleChart();
+}
+
+// ═══════════════════════════════════
+//  BUBBLE CHART
+// ═══════════════════════════════════
+function drawBubbleChart() {
+  const canvas = document.getElementById('bubble-canvas');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.parentElement.clientWidth - 48;
+  const H = 380;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = {top: 30, right: 30, bottom: 55, left: 68};
+  const cW = W - pad.left - pad.right;
+  const cH = H - pad.top - pad.bottom;
+
+  const salMin = 10000, salMax = 70000;
+  const riskMin = 0.1, riskMax = 0.8;
+
+  function toX(sal) { return pad.left + (sal - salMin) / (salMax - salMin) * cW; }
+  function toY(risk) { return pad.top + (1 - (risk - riskMin) / (riskMax - riskMin)) * cH; }
+  function toR(survival) { return 8 + survival * 12; }
+
+  // Background
+  ctx.clearRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(26,39,64,0.8)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 6; i++) {
+    const x = pad.left + (i/6) * cW;
+    ctx.beginPath(); ctx.moveTo(x, pad.top); ctx.lineTo(x, pad.top + cH); ctx.stroke();
+  }
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (i/4) * cH;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cW, y); ctx.stroke();
+  }
+
+  // Axis labels — X (Salary)
+  ctx.fillStyle = 'rgba(107,128,158,0.9)';
+  ctx.font = '11px DM Mono, monospace';
+  ctx.textAlign = 'center';
+  const salTicks = [10000, 20000, 30000, 40000, 50000, 60000, 70000];
+  salTicks.forEach(s => {
+    ctx.fillText(`$${s/1000}K`, toX(s), H - 12);
+  });
+  ctx.fillText('Annual Salary', pad.left + cW / 2, H - 0);
+
+  // Axis labels — Y (Safety / Risk)
+  ctx.textAlign = 'right';
+  const riskTicks = [0.1, 0.3, 0.5, 0.7];
+  riskTicks.forEach(r => {
+    ctx.fillText(r.toFixed(1), pad.left - 8, toY(r) + 4);
+  });
+
+  // Y axis label
+  ctx.save();
+  ctx.translate(14, pad.top + cH / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center';
+  ctx.fillText('← Higher Risk   Lower Risk →', 0, 0);
+  ctx.restore();
+
+  // Zone labels
+  ctx.fillStyle = 'rgba(0,229,176,0.12)';
+  ctx.fillRect(pad.left, pad.top, cW, cH * 0.35);
+  ctx.fillStyle = 'rgba(255,80,80,0.07)';
+  ctx.fillRect(pad.left, pad.top + cH * 0.65, cW, cH * 0.35);
+
+  ctx.fillStyle = 'rgba(0,229,176,0.25)';
+  ctx.font = '10px Syne, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('SAFE ZONE', pad.left + cW - 4, pad.top + 14);
+  ctx.fillStyle = 'rgba(255,80,80,0.35)';
+  ctx.fillText('DANGER ZONE', pad.left + cW - 4, pad.top + cH - 4);
+
+  // Compute positions and store for hit testing
+  canvasData = DATA.map((d, idx) => {
+    const score = scoreMatch(d);
+    const matched = score >= 0.5;
+    return {
+      d, idx,
+      x: toX(d.salary),
+      y: toY(d.risk),
+      r: toR(d.survival),
+      color: {'Low Risk':'#00e5b0','Medium Risk':'#ffad3b','High Risk':'#ff5050'}[d.riskCat],
+      matched, score
+    };
+  });
+
+  // Draw unmatched first (behind)
+  canvasData.filter(p => !p.matched).forEach(p => {
+    ctx.globalAlpha = 0.12;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  });
+
+  // Draw matched
+  canvasData.filter(p => p.matched).forEach(p => {
+    const isHL = p.idx === highlightedIdx;
+    ctx.globalAlpha = p.score >= 0.75 ? 0.9 : 0.55;
+
+    // Glow for best match
+    if (p.score >= 0.75 || isHL) {
+      ctx.shadowBlur = isHL ? 24 : 16;
+      ctx.shadowColor = isHL ? '#b8ff47' : p.color;
+    }
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = p.score >= 0.75 ? '#b8ff47' : p.color;
+    ctx.fill();
+
+    if (isHL) {
+      ctx.strokeStyle = '#b8ff47';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+
+    // Label
+    const shortName = p.d.job.replace('Engineer','Eng').replace('Analyst','Anlst').replace('Researcher','Rsch').replace('Manager','Mgr').replace('Scientist','Sci');
+    ctx.fillStyle = p.score >= 0.75 ? 'rgba(6,9,26,0.95)' : 'rgba(230,224,212,0.85)';
+    ctx.font = `bold ${Math.max(8, p.r * 0.55)}px Syne, sans-serif`;
+    ctx.textAlign = 'center';
+    const lines = wrapText(ctx, shortName, p.r * 1.8);
+    lines.forEach((line, li) => {
+      const lineH = Math.max(9, p.r * 0.6);
+      ctx.fillText(line, p.x, p.y + li * lineH - (lines.length - 1) * lineH / 2 + 3);
+    });
+    // Exp badge
+    ctx.font = `${Math.max(7, p.r * 0.42)}px DM Mono, monospace`;
+    ctx.fillStyle = p.score >= 0.75 ? 'rgba(6,9,26,0.7)' : 'rgba(107,128,158,0.9)';
+    ctx.fillText(p.d.exp[0], p.x, p.y + p.r * 0.8 + 3);
+  });
+
+  // Tooltip canvas handler is set up once below
+}
+
+function wrapText(ctx, text, maxW) {
+  const words = text.split(' ');
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    const test = cur ? cur + ' ' + w : w;
+    if (ctx.measureText(test).width > maxW && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// ─── TOOLTIP HANDLING ───
+let tooltipActive = false;
+document.getElementById('bubble-canvas')?.addEventListener('mousemove', function(e) {
+  const canvas = this;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width / (window.devicePixelRatio || 1));
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height / (window.devicePixelRatio || 1));
+
+  let hit = null;
+  for (const p of canvasData) {
+    const dist = Math.sqrt((p.x - mx) ** 2 + (p.y - my) ** 2);
+    if (dist <= p.r + 4) { hit = p; break; }
+  }
+
+  const tt = document.getElementById('tooltip');
+  if (hit) {
+    tt.innerHTML = `
+      <div class="tt-title" style="color:${hit.color}">${hit.d.job}</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">${hit.d.exp}-level · ${hit.d.riskCat}</div>
+      <div class="tt-row"><span>Salary</span><span>$${(hit.d.salary/1000).toFixed(1)}K</span></div>
+      <div class="tt-row"><span>AI Risk</span><span>${hit.d.risk.toFixed(3)}</span></div>
+      <div class="tt-row"><span>Survival Score</span><span>${hit.d.survival.toFixed(2)} / 2.0</span></div>
+      <div class="tt-row"><span>Key Skill</span><span>${hit.d.skills[0]}</span></div>
+      <div class="tt-row"><span>Job Openings</span><span>${(hit.d.openings/1000).toFixed(0)}K</span></div>`;
+    tt.style.left = (e.clientX + 16) + 'px';
+    tt.style.top = (e.clientY - 10) + 'px';
+    tt.classList.add('visible');
+    canvas.style.cursor = 'pointer';
+  } else {
+    tt.classList.remove('visible');
+    canvas.style.cursor = 'crosshair';
+  }
+});
+
+document.getElementById('bubble-canvas')?.addEventListener('mouseleave', () => {
+  document.getElementById('tooltip').classList.remove('visible');
+});
+
+document.getElementById('bubble-canvas')?.addEventListener('click', function(e) {
+  const canvas = this;
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width / (window.devicePixelRatio || 1));
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height / (window.devicePixelRatio || 1));
+
+  for (const p of canvasData) {
+    const dist = Math.sqrt((p.x - mx) ** 2 + (p.y - my) ** 2);
+    if (dist <= p.r + 4) {
+      highlightBubble(p.idx);
+      // scroll to card
+      const card = document.getElementById(`card-${p.idx}`);
+      if (card) card.scrollIntoView({behavior:'smooth', block:'nearest'});
+      break;
+    }
+  }
+});
+
+window.addEventListener('resize', () => {
+  if (currentStep === 'results') drawBubbleChart();
+});
+</script>
+</body>
+</html>
